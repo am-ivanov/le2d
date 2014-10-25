@@ -1,0 +1,22 @@
+ad@adpc ~/code/le2d_icc $ ./a.out aff_cf_av.txt 20 4 4 8 12 16 20 >>
+aff_cf_av_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_cf_gcc.txt 20 4 4 8 12 16 20 >>
+aff_cf_gcc_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_cf.txt 20 4 4 8 12 16 20 >>
+aff_cf_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_pthread_av.txt 20 4 4 8 12 16 20 >>
+aff_pthread_av_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_pthread_gcc.txt 20 4 4 8 12 16 20 >>
+aff_pthread_gcc_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_pthread.txt 20 4 4 8 12 16 20 >>
+aff_pthread_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_spl_gr_av.txt 20 4 4 8 12 16 20 >>
+aff_spl_gr_av_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_spl_gr_gcc.txt 20 4 4 8 12 16 20 >>
+aff_spl_gr_gcc_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_spl_gr.txt 20 4 4 8 12 16 20 >>
+aff_spl_gr_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_simple.txt 20 4 4 8 12 16 20 >>
+aff_simple_toplot.txt
+ad@adpc ~/code/le2d_icc $ ./a.out aff_simple_gcc.txt 20 4 4 8 12 16 20 >>
+aff_simple_gcc_toplot.txt
