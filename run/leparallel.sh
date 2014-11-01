@@ -1,4 +1,6 @@
-target=gcc_compiler
+BATCH --time=1000
+#target=all,gcc_compiler
+target=all
 
 echo comiling binaries
 make -f ../simple/Makefile -C ../simple $target
@@ -34,9 +36,9 @@ echo pthread version
 echo splitted grid version
 ./leparallel_spl_gr.sh
 
-if (($target == gcc_compiler)) 
-	then
-		rm *_icc_*
+if [ "$target" == gcc_compiler ]
+        then
+	                rm *_icc_*
 fi
 
-echo "OK"
+echo OK

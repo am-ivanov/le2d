@@ -1,3 +1,5 @@
+#!/bin/bash
+
 n=24
 step=2
 grid=4000
