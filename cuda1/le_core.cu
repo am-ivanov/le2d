@@ -353,7 +353,7 @@ double le_step(le_task *task, int steps)
 	int ny = task->n.y;
 
 	// set sizes of blocks on gpu
-	int threads_width = 32;
+	int threads_width = 16;
 	dim3 threadsPerBlock(threads_width, threads_width);
     dim3 blocksPerGrid((nx + threads_width - 1) / threads_width, (ny  + threads_width - 1) / threads_width);
 
