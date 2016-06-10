@@ -279,7 +279,7 @@ void loadFromFile(const char* filename, char* source, int max_size)
 	fclose(input);
 }
 
-double le_step(le_task *task, int steps)
+double le_step(le_task *task, int steps, int devices)
 {
 	const int nx = task->n.x;
 	const int ny = task->n.y;
@@ -296,7 +296,6 @@ double le_step(le_task *task, int steps)
 	for (int cn = 0; cn != NODE_SIZE; ++cn)
 	for (int j = 0; j != ny; ++j)
 	for (int i = 0; i != nx; ++i) {
-		//da[(i + 2) + (j + 2) * (nx + 4) + cn * (nx + 4) * (ny + 4)] = task->grid[i + j * nx + cn * nx * ny];
 		da(i, j, cn) = task->grid[i + j * nx + cn * nx * ny];
 	}
 	
@@ -304,8 +303,9 @@ double le_step(le_task *task, int steps)
 	
 	assert(clw.getPlatformsNum() == 1);
 	assert(clw.getDevicesNum() != 0);
+	assert(devices <= clw.getDevicesNum());
 	
-	rgrid::DArrayContainer<real, int> dac(da, 1, clw.getDevicesNum(), 1);
+	rgrid::DArrayContainer<real, int> dac(da, 1, devices, 1);
 	
 	const real k1x = task->dt * task->mat.c1 / task->h.x;
 	const real k2x = task->dt * task->mat.c2 / task->h.x;
@@ -318,16 +318,17 @@ double le_step(le_task *task, int steps)
 	size_t local_work_size_x[2] = {
 		block_dim_stepx_x, 
 		block_dim_stepx_y};
-	size_t global_work_size_x[2] = {
-		(nx + block_dim_stepx_x - 1) / block_dim_stepx_x * block_dim_stepx_x,
-		(ny  + block_dim_stepx_y - 1) / block_dim_stepx_y * block_dim_stepx_y};
+// 	size_t global_work_size_x[2] = {
+// 		(nx + block_dim_stepx_x - 1) / block_dim_stepx_x * block_dim_stepx_x,
+// 		(ny  + block_dim_stepx_y - 1) / block_dim_stepx_y * block_dim_stepx_y};
 	size_t sharedMemSizeX = (block_dim_stepx_x + 4) * block_dim_stepx_y * NODE_SIZE * sizeof(real);
 	
 	size_t block_dim_stepy_x = 16;
 	size_t block_dim_stepy_y = 16;
 	size_t local_work_size_y[2] = {block_dim_stepy_x, block_dim_stepy_y};
-	size_t global_work_size_y[2] = {(nx + block_dim_stepy_x - 1) / block_dim_stepy_x * block_dim_stepy_x, 
-		(ny  + block_dim_stepy_y - 1) / block_dim_stepy_y * block_dim_stepy_y};
+// 	size_t global_work_size_y[2] = {
+// 		(nx + block_dim_stepy_x - 1) / block_dim_stepy_x * block_dim_stepy_x, 
+// 		(ny  + block_dim_stepy_y - 1) / block_dim_stepy_y * block_dim_stepy_y};
 	size_t sharedMemSizeY = block_dim_stepy_x * (block_dim_stepy_y + 4) * NODE_SIZE * sizeof(real);
 	
 	
@@ -361,7 +362,7 @@ double le_step(le_task *task, int steps)
 	
 	cl_kernel kernel_step_x[MAX_ENTRIES], kernel_step_y[MAX_ENTRIES];
 	
-	for (int dev = 0; dev != clw.getDevicesNum(); ++dev) {
+	for (int dev = 0; dev != devices; ++dev) {
 		rgrid::DArray<real, int>& dap = dac.getDArrayPart(dev);
 		dap.setCLContext(clw.getContext());
 		dap.setCLCQ(clw.getCommandQueue(dev));
@@ -375,6 +376,8 @@ double le_step(le_task *task, int steps)
 		
 		int lnx = dap.localSize(rgrid::X);
 		int lny = dap.localSize(rgrid::Y);
+		
+		printf("device %d, lnx %d, lny %d\n", dev, lnx, lny);
 		
 		// set kernel args
 		CHECK_CL_ERROR(clSetKernelArg(kernel_step_x[dev], 0, sizeof(lnx), &lnx));
@@ -396,35 +399,49 @@ double le_step(le_task *task, int steps)
 	// add kernel execution in queue
 	for (int i = 0; i < steps; i++)
 	{
-		dac.syncCL();
-		dac.fillGhostCL();
-		for (int dev = 0; dev != clw.getDevicesNum(); ++dev) {
+		//dac.syncCL();
+		//dac.fillGhostCL();
+		for (int dev = 0; dev != devices; ++dev) {
 			rgrid::DArray<real, int>& dap = dac.getDArrayPart(dev);
 			cl_mem d_grid1 = dap.getCLBuffer();
 			cl_mem d_grid2 = dap.getCLBuffer2();
+			
+			size_t global_work_size_x[2] = {
+				(dap.localSize(rgrid::X) + block_dim_stepx_x - 1) / block_dim_stepx_x * block_dim_stepx_x,
+				(dap.localSize(rgrid::Y)  + block_dim_stepx_y - 1) / block_dim_stepx_y * block_dim_stepx_y};
+			
 			CHECK_CL_ERROR(clSetKernelArg(kernel_step_x[dev], 5, sizeof(d_grid1), &d_grid1));
 			CHECK_CL_ERROR(clSetKernelArg(kernel_step_x[dev], 6, sizeof(d_grid2), &d_grid2));
 			CHECK_CL_ERROR(clEnqueueNDRangeKernel(clw.getCommandQueue(dev), kernel_step_x[dev], 2, NULL, global_work_size_x, local_work_size_x, 0, NULL, NULL));
 			dap.swapCLBuffers();
 		}
 		dac.syncCL();
-		dac.fillGhostCL();
-		for (int dev = 0; dev != clw.getDevicesNum(); ++dev) {
+		//dac.fillGhostCL();
+		for (int dev = 0; dev != devices; ++dev) {
+			unsigned side = 0;
+			if (dev == 0) side |= 1u;
+			if (dev == devices - 1) side |= 2u;
 			rgrid::DArray<real, int>& dap = dac.getDArrayPart(dev);
 			cl_mem d_grid1 = dap.getCLBuffer();
 			cl_mem d_grid2 = dap.getCLBuffer2();
+			
+			size_t global_work_size_y[2] = {
+				(dap.localSize(rgrid::X) + block_dim_stepy_x - 1) / block_dim_stepy_x * block_dim_stepy_x, 
+				(dap.localSize(rgrid::Y)  + block_dim_stepy_y - 1) / block_dim_stepy_y * block_dim_stepy_y};
+			
 			CHECK_CL_ERROR(clSetKernelArg(kernel_step_y[dev], 5, sizeof(d_grid1), &d_grid1));
 			CHECK_CL_ERROR(clSetKernelArg(kernel_step_y[dev], 6, sizeof(d_grid2), &d_grid2));
+			CHECK_CL_ERROR(clSetKernelArg(kernel_step_y[dev], 8, sizeof(side), &side));
 			CHECK_CL_ERROR(clEnqueueNDRangeKernel(clw.getCommandQueue(dev), kernel_step_y[dev], 2, NULL, global_work_size_y, local_work_size_y, 0, NULL, NULL));
 			dap.swapCLBuffers();
 		}
 	}
-	for (int dev = 0; dev != clw.getDevicesNum(); ++dev) {
+	for (int dev = 0; dev != devices; ++dev) {
 		CHECK_CL_ERROR(clFinish(clw.getCommandQueue(dev)));
 	}
 	t = timer() - t;
 
-	for (int dev = 0; dev != clw.getDevicesNum(); ++dev) {
+	for (int dev = 0; dev != devices; ++dev) {
 		rgrid::DArray<real, int>& dap = dac.getDArrayPart(dev);
 		// return data to host
 		dap.clDtoH();
@@ -442,7 +459,6 @@ double le_step(le_task *task, int steps)
 	for (int cn = 0; cn != NODE_SIZE; ++cn)
 	for (int j = 0; j != ny; ++j)
 	for (int i = 0; i != nx; ++i) {
-		//task->grid[i + j * nx + cn * nx * ny] = da[(i + 2) + (j + 2) * (nx + 4) + cn * (nx + 4) * (ny + 4)];
 		task->grid[i + j * nx + cn * nx * ny] = da(i, j, cn);
 	}
 	

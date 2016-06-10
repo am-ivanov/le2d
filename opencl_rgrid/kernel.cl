@@ -127,16 +127,20 @@ inline void reconstruct(const le_w ppu, const le_w pu, const le_w u, const le_w 
 	d->w4 = tvd2(k2, nnu.w4, nu.w4, u.w4, pu.w4); // -c2
 }
 
-// inline real g_ind(__global const real* grid, int i, int j, const int nx, const int ny, const int node)
-// {
-// 	// TODO it works only with SOA
-// 
-// 	if (i < 0) i = 0;
-// 	if (i >= nx) i = nx - 1;
-// 	if (j < 0) j = 0;
-// 	if (j >= ny) j = ny - 1;
-// 	return (*(grid + (i) + (j) * nx + node * nx * ny));
-// }
+inline real g_ind_x(__global const real* grid, int i, int j, const int nx, const int ny, const int node)
+{
+	if (i < 0) i = 0;
+	if (i >= nx) i = nx - 1;
+	return (*(grid + (i+2) + (j+2) * (nx+4) + node * (nx+4) * (ny+4)));
+}
+
+inline real g_ind_y(__global const real* grid, int i, int j, const int nx, const int ny, const int node, const unsigned side_edge)
+{
+	if (j < 0 && (side_edge & 1u)) j = 0;
+	if (j >= ny && (side_edge & 2u)) j = ny - 1;
+	return (*(grid + (i+2) + (j+2) * (nx+4) + node * (nx+4) * (ny+4)));
+}
+
 #define g_ind(g, i, j, nx, ny, node) \
 	(g)[(i + 2) + (j + 2) * (nx + 4) + (node) * (nx + 4) * (ny + 4)]
 
@@ -151,23 +155,23 @@ __kernel void le_step_x(const int nx, const int ny, const real k1, const real k2
 	real vx, vy, sxx, sxy, syy;
 	le_w w_2, w_1, w, w1, w2, d;
 
-	s_indx_vx(li, lj) = g_ind(in_grid, i, j, nx, ny, 0);
-	s_indx_vy(li, lj) = g_ind(in_grid, i, j, nx, ny, 1);
-	s_indx_sxx(li, lj) = g_ind(in_grid, i, j, nx, ny, 2);
-	s_indx_sxy(li, lj) = g_ind(in_grid, i, j, nx, ny, 3);
-	s_indx_syy(li, lj) = g_ind(in_grid, i, j, nx, ny, 4);
+	s_indx_vx(li, lj) = g_ind_x(in_grid, i, j, nx, ny, 0);
+	s_indx_vy(li, lj) = g_ind_x(in_grid, i, j, nx, ny, 1);
+	s_indx_sxx(li, lj) = g_ind_x(in_grid, i, j, nx, ny, 2);
+	s_indx_sxy(li, lj) = g_ind_x(in_grid, i, j, nx, ny, 3);
+	s_indx_syy(li, lj) = g_ind_x(in_grid, i, j, nx, ny, 4);
 	if (li < 2) {
-		s_indx_vx(li - 2, lj) = g_ind(in_grid, i - 2, j, nx, ny, 0);
-		s_indx_vy(li - 2, lj) = g_ind(in_grid, i - 2, j, nx, ny, 1);
-		s_indx_sxx(li - 2, lj) = g_ind(in_grid, i - 2, j, nx, ny, 2);
-		s_indx_sxy(li - 2, lj) = g_ind(in_grid, i - 2, j, nx, ny, 3);
-		s_indx_syy(li - 2, lj) = g_ind(in_grid, i - 2, j, nx, ny, 4);
+		s_indx_vx(li - 2, lj) = g_ind_x(in_grid, i - 2, j, nx, ny, 0);
+		s_indx_vy(li - 2, lj) = g_ind_x(in_grid, i - 2, j, nx, ny, 1);
+		s_indx_sxx(li - 2, lj) = g_ind_x(in_grid, i - 2, j, nx, ny, 2);
+		s_indx_sxy(li - 2, lj) = g_ind_x(in_grid, i - 2, j, nx, ny, 3);
+		s_indx_syy(li - 2, lj) = g_ind_x(in_grid, i - 2, j, nx, ny, 4);
 	} else if (li >= get_local_size(0) - 2) {
-		s_indx_vx(li + 2, lj) = g_ind(in_grid, i + 2, j, nx, ny, 0);
-		s_indx_vy(li + 2, lj) = g_ind(in_grid, i + 2, j, nx, ny, 1);
-		s_indx_sxx(li + 2, lj) = g_ind(in_grid, i + 2, j, nx, ny, 2);
-		s_indx_sxy(li + 2, lj) = g_ind(in_grid, i + 2, j, nx, ny, 3);
-		s_indx_syy(li + 2, lj) = g_ind(in_grid, i + 2, j, nx, ny, 4);
+		s_indx_vx(li + 2, lj) = g_ind_x(in_grid, i + 2, j, nx, ny, 0);
+		s_indx_vy(li + 2, lj) = g_ind_x(in_grid, i + 2, j, nx, ny, 1);
+		s_indx_sxx(li + 2, lj) = g_ind_x(in_grid, i + 2, j, nx, ny, 2);
+		s_indx_sxy(li + 2, lj) = g_ind_x(in_grid, i + 2, j, nx, ny, 3);
+		s_indx_syy(li + 2, lj) = g_ind_x(in_grid, i + 2, j, nx, ny, 4);
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
@@ -191,7 +195,7 @@ __kernel void le_step_x(const int nx, const int ny, const real k1, const real k2
 }
 
 __kernel void le_step_y(const int nx, const int ny, const real k1, const real k2, const le_material mat,
-		__global const real* in_grid, __global real* grid, __local real* shared_grid)
+		__global const real* in_grid, __global real* grid, __local real* shared_grid, const unsigned side_edge)
 {
 	const int i = get_global_id(0);
 	const int j = get_global_id(1);
@@ -201,23 +205,23 @@ __kernel void le_step_y(const int nx, const int ny, const real k1, const real k2
 	real vx, vy, sxx, sxy, syy;
 	le_w w_2, w_1, w, w1, w2, d;
 
-	s_indy_vx(li, lj) = g_ind(in_grid, i, j, nx, ny, 0);
-	s_indy_vy(li, lj) = g_ind(in_grid, i, j, nx, ny, 1);
-	s_indy_sxx(li, lj) = g_ind(in_grid, i, j, nx, ny, 2);
-	s_indy_sxy(li, lj) = g_ind(in_grid, i, j, nx, ny, 3);
-	s_indy_syy(li, lj) = g_ind(in_grid, i, j, nx, ny, 4);
+	s_indy_vx(li, lj) = g_ind_y(in_grid, i, j, nx, ny, 0, side_edge);
+	s_indy_vy(li, lj) = g_ind_y(in_grid, i, j, nx, ny, 1, side_edge);
+	s_indy_sxx(li, lj) = g_ind_y(in_grid, i, j, nx, ny, 2, side_edge);
+	s_indy_sxy(li, lj) = g_ind_y(in_grid, i, j, nx, ny, 3, side_edge);
+	s_indy_syy(li, lj) = g_ind_y(in_grid, i, j, nx, ny, 4, side_edge);
 	if (lj < 2) {
-		s_indy_vx(li, lj - 2) = g_ind(in_grid, i, j - 2, nx, ny, 0);
-		s_indy_vy(li, lj - 2) = g_ind(in_grid, i, j - 2, nx, ny, 1);
-		s_indy_sxx(li, lj - 2) = g_ind(in_grid, i, j - 2, nx, ny, 2);
-		s_indy_sxy(li, lj - 2) = g_ind(in_grid, i, j - 2, nx, ny, 3);
-		s_indy_syy(li, lj - 2) = g_ind(in_grid, i, j - 2, nx, ny, 4);
+		s_indy_vx(li, lj - 2) = g_ind_y(in_grid, i, j - 2, nx, ny, 0, side_edge);
+		s_indy_vy(li, lj - 2) = g_ind_y(in_grid, i, j - 2, nx, ny, 1, side_edge);
+		s_indy_sxx(li, lj - 2) = g_ind_y(in_grid, i, j - 2, nx, ny, 2, side_edge);
+		s_indy_sxy(li, lj - 2) = g_ind_y(in_grid, i, j - 2, nx, ny, 3, side_edge);
+		s_indy_syy(li, lj - 2) = g_ind_y(in_grid, i, j - 2, nx, ny, 4, side_edge);
 	} else if (lj >= get_local_size(1) - 2) {
-		s_indy_vx(li, lj + 2) = g_ind(in_grid, i, j + 2, nx, ny, 0);
-		s_indy_vy(li, lj + 2) = g_ind(in_grid, i, j + 2, nx, ny, 1);
-		s_indy_sxx(li, lj + 2) = g_ind(in_grid, i, j + 2, nx, ny, 2);
-		s_indy_sxy(li, lj + 2) = g_ind(in_grid, i, j + 2, nx, ny, 3);
-		s_indy_syy(li, lj + 2) = g_ind(in_grid, i, j + 2, nx, ny, 4);
+		s_indy_vx(li, lj + 2) = g_ind_y(in_grid, i, j + 2, nx, ny, 0, side_edge);
+		s_indy_vy(li, lj + 2) = g_ind_y(in_grid, i, j + 2, nx, ny, 1, side_edge);
+		s_indy_sxx(li, lj + 2) = g_ind_y(in_grid, i, j + 2, nx, ny, 2, side_edge);
+		s_indy_sxy(li, lj + 2) = g_ind_y(in_grid, i, j + 2, nx, ny, 3, side_edge);
+		s_indy_syy(li, lj + 2) = g_ind_y(in_grid, i, j + 2, nx, ny, 4, side_edge);
 	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);

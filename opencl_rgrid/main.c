@@ -17,11 +17,13 @@ const int save_every_step = 0;
 
 int main(int argc, char *argv[])
 {
-	if (argc != 4) {
-		printf("Usage: %s nx ny steps.\n", argv[0]);
+	if (argc != 5) {
+		printf("Usage: %s nx ny steps devices.\n", argv[0]);
 		return 1;
 	}
 	//int i;
+	int devices = atoi(argv[4]);
+	
 	le_point2 n = {atoi(argv[1]), atoi(argv[2])};
 	int steps = atoi(argv[3]);
 	le_task task;
@@ -45,7 +47,7 @@ int main(int argc, char *argv[])
 		}
 		le_step(&task);
 	}*/
-	t = le_step(&task, steps);
+	t = le_step(&task, steps, devices);
 
 	printf("%d %d %d %f\n", n.x, n.y, steps, t);
 

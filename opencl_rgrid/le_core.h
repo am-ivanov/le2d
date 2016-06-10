@@ -48,7 +48,7 @@ void le_set_ball(le_task *t, const le_vec2 c, const real r, const real s);
 int le_save_task(le_task *task, const char *file);
 
 /* One time step of difference scheme. */
-double le_step(le_task *task, int steps);
+double le_step(le_task *task, int steps, int devices);
 
 #endif //LE_CORE_H
 
